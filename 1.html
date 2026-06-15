@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>学生品行分管理系统 - 云端版</title>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script>
+        if (typeof XLSX === 'undefined') {
+            document.write('<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>');
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow-x: auto; overflow-y: auto; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: visible;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 30px;
+            color: white;
+            border-radius: 16px 16px 0 0;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header h1 i { margin-right: 10px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        
+        .sync-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            margin: 15px 30px 0 30px;
+            background: #e8f4f8;
+            border-radius: 8px;
+            font-size: 13px;
+            border-left: 4px solid #17a2b8;
+            flex-wrap: wrap;
+        }
+        .sync-bar.success { background: #d4edda; border-left-color: #28a745; }
+        .sync-bar.error { background: #f8d7da; border-left-color: #dc3545; }
+        .sync-bar.loading { background: #fff3cd; border-left-color: #ffc107; }
+        .sync-bar button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .section-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            margin: 0 30px;
+            flex-wrap: wrap;
+        }
+        .section-tab {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #6c757d;
+        }
+        .section-tab i { margin-right: 8px; }
+        .section-tab:hover { background: #e9ecef; color: #5a67d8; }
+        .section-tab.active { color: #667eea; border-bottom: 3px solid #667eea; background: white; }
+        
+        .section-content { display: none; padding: 20px 0; }
+        .section-content.active { display: block; }
+        
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin: 0 30px 20px 30px;
+            flex-wrap: wrap;
+        }
+        .toolbar button { 
+            background: #6c757d; 
+            cursor: pointer; 
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .toolbar button i { margin-right: 6px; }
+        .toolbar button.export-btn { background: #28a745; }
+        .toolbar button.import-btn { background: #17a2b8; }
+        .toolbar button.clear-btn { background: #dc3545; }
+        .toolbar button:hover { opacity: 0.85; transform: translateY(-1px); }
+        
+        .export-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .export-dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: white;
+            min-width: 180px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            z-index: 100;
+            right: 0;
+            top: 100%;
+            margin-top: 5px;
+        }
+        .export-dropdown-content.show { display: block; }
+        .export-dropdown-content button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: white;
+            color: #333;
+            padding: 10px 15px;
+            border: none;
+            border-bottom: 1px solid #eee;
+            border-radius: 0;
+        }
+        .export-dropdown-content button:first-child { border-radius: 8px 8px 0 0; }
+        .export-dropdown-content button:last-child { border-radius: 0 0 8px 8px; border-bottom: none; }
+        .export-dropdown-content button:hover { background: #f0f0f0; }
+        
+        .rank-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            margin: 0 30px 20px 30px;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        .rank-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            border-left: 4px solid #667eea;
+            padding-left: 12px;
+        }
+        .rank-title i { margin-right: 8px; color: #667eea; }
+        .rank-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .rank-item:hover { background: #f8f9fa; transform: translateX(5px); }
+        .rank-number {
+            width: 50px;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .rank-number.gold { color: #ffc107; }
+        .rank-number.silver { color: #c0c0c0; }
+        .rank-number.bronze { color: #cd7f32; }
+        .rank-info {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .rank-name { font-weight: 600; color: #333; min-width: 100px; }
+        .rank-class { color: #666; font-size: 13px; min-width: 80px; }
+        .rank-score {
+            font-weight: 700;
+            font-size: 20px;
+            min-width: 80px;
+            text-align: right;
+        }
+        .rank-score.excellent { color: #28a745; }
+        .rank-score.good { color: #17a2b8; }
+        .rank-score.normal { color: #ffc107; }
+        .rank-score.poor { color: #dc3545; }
+        
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin: 0 30px;
+        }
+        .class-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .class-card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .class-card-header i { margin-right: 8px; }
+        .class-rank-list {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .class-rank-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .class-rank-item:hover { background: #f8f9fa; }
+        .class-rank-num {
+            width: 35px;
+            font-weight: 600;
+            color: #666;
+        }
+        .class-rank-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        .class-rank-score {
+            font-weight: 600;
+            color: #667eea;
+        }
+        .class-rank-score.excellent { color: #28a745; }
+        .class-rank-score.good { color: #17a2b8; }
+        .class-rank-score.normal { color: #ffc107; }
+        .class-rank-score.poor { color: #dc3545; }
+        .class-empty {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+        }
+        
+        .import-section {
+            background: #e8f4f8;
+            margin: 0 30px 20px 30px;
+            padding: 15px 20px;
+            border-radius: 12px;
+            border-left: 4px solid #17a2b8;
+        }
+        .import-section h4 { margin-bottom: 10px; color: #17a2b8; }
+        .import-section p { font-size: 13px; margin-bottom: 10px; }
+        .import-section a { color: #17a2b8; cursor: pointer; text-decoration: underline; }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            overflow-y: visible;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 13px;
+        }
+        th, td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+            border-right: 1px solid #f0f0f0;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            white-space: nowrap;
+        }
+        th i { margin-right: 4px; }
+        
+        .deduction-cell { font-size: 12px; }
+        .deduction-count { color: #dc3545; font-weight: 600; }
+        .deduction-zero { color: #aaa; }
+        .total-deduction { font-weight: 700; color: #dc3545; }
+        .final-score { font-weight: 700; font-size: 16px; }
+        .final-score.excellent { color: #28a745; }
+        .final-score.good { color: #17a2b8; }
+        .final-score.normal { color: #ffc107; }
+        .final-score.poor { color: #dc3545; }
+        
+        .stats-footer {
+            margin: 20px 30px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+        }
+        .stats-footer i { margin-right: 6px; color: #667eea; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 12px;
+            width: 95%;
+            max-width: 750px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        .modal-content h3 { margin-bottom: 15px; color: #333; }
+        .modal-content h3 i { margin-right: 8px; color: #667eea; }
+        .match-fields-container { max-height: 400px; overflow-y: auto; margin-bottom: 15px; }
+        .match-field-group { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .match-field-group label { font-weight: 600; display: block; margin-bottom: 5px; }
+        .match-field-group select { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; }
+        
+        .preview-table {
+            font-size: 12px;
+            margin: 15px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 250px;
+        }
+        .preview-table table {
+            min-width: 100%;
+            font-size: 12px;
+            border-collapse: collapse;
+        }
+        .preview-table th, .preview-table td {
+            padding: 6px 10px;
+            white-space: nowrap;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .preview-table th {
+            background: #667eea;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+        
+        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        
+        .module-selector {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #c5d5f0;
+        }
+        .module-selector label {
+            font-weight: 600;
+            margin-right: 15px;
+            color: #667eea;
+        }
+        .module-selector select, .module-selector input {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            min-width: 200px;
+        }
+        
+        .detail-modal {
+            max-width: 500px;
+        }
+        .detail-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .detail-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .toolbar, .rank-section, .import-section, .table-wrapper, .stats-footer, .class-grid, .sync-bar { margin-left: 15px; margin-right: 15px; }
+            th, td { padding: 6px 4px; font-size: 11px; }
+            .class-grid { grid-template-columns: 1fr; }
+            .modal-content { width: 98%; }
+        }
+        #file-input-student, #file-input-deduction, #file-input-json { display: none; }
+        
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 11px;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-gavel"></i> 学生品行分管理系统</h1>
+            <p><i class="fas fa-cloud-upload-alt"></i> 云端版 | 数据实时同步 | 多设备共享</p>
+        </div>
+        
+        <div class="sync-bar" id="sync-bar">
+            <i class="fas fa-cloud"></i>
+            <span id="sync-status">正在连接云端...</span>
+            <button id="sync-btn"><i class="fas fa-sync-alt"></i> 手动同步</button>
+        </div>
+        
+        <div class="toolbar">
+            <button class="import-btn" onclick="openStudentImport()"><i class="fas fa-users"></i> 导入学生名单</button>
+            <button class="import-btn" onclick="openDeductionImport()"><i class="fas fa-minus-circle"></i> 导入扣分记录</button>
+            <div class="export-dropdown">
+                <button class="export-btn" id="exportDropdownBtn"><i class="fas fa-file-excel"></i> 导出数据 ▼</button>
+                <div class="export-dropdown-content" id="exportDropdownContent">
+                    <button onclick="exportAllToExcel()"><i class="fas fa-database"></i> 导出全部数据</button>
+                    <button onclick="exportClassToExcel()"><i class="fas fa-school"></i> 导出班级数据</button>
+                </div>
+            </div>
+            <button class="clear-btn" onclick="clearAllData()"><i class="fas fa-trash-alt"></i> 清空所有数据</button>
+        </div>
+        
+        <div class="import-section">
+            <h4><i class="fas fa-info-circle"></i> 批量导入说明</h4>
+            <p>✅ <strong>导入学生名单</strong>：Excel需要包含【姓名、学号、班级、年级】列<br>
+            ✅ <strong>导入扣分记录</strong>：Excel只需要【姓名/学号】和【分数/扣分值】（选填），系统根据选择的模块自动扣分<br>
+            ✅ <strong>宿舍卫生扣分规则</strong>：分数70-79扣3分，分数70以下扣5分，80分以上不扣分<br>
+            ✅ <strong>分数列为选填</strong>：如果不填分数列，则使用模块默认扣分<br>
+            <a onclick="downloadTemplate()"><i class="fas fa-download"></i> 点击下载模板文件</a></p>
+        </div>
+        
+        <div class="section-tabs">
+            <button class="section-tab active" onclick="switchSection('overall')"><i class="fas fa-chart-line"></i> 整体板块</button>
+            <button class="section-tab" onclick="switchSection('class')"><i class="fas fa-school"></i> 班级板块</button>
+        </div>
+        
+        <!-- 整体板块 -->
+        <div id="overall-section" class="section-content active">
+            <div class="rank-section">
+                <div class="rank-title"><i class="fas fa-trophy"></i> 个人品行分排名</div>
+                <div id="rank-list" class="rank-list">
+                    <div style="text-align:center; padding:30px;"><i class="fas fa-spinner fa-pulse"></i> 加载中...</div>
+                </div>
+            </div>
+            
+            <div class="form-title" style="margin: 0 30px 15px 30px; font-size:18px; font-weight:600;">
+                <i class="fas fa-table-list"></i> 学生扣分明细表（每人一行，7个模块）
+            </div>
+            <div class="table-wrapper">
+                <table id="student-stats-table">
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-user"></i> 姓名</th>
+                            <th><i class="fas fa-id-card"></i> 学号</th>
+                            <th><i class="fas fa-building"></i> 班级</th>
+                            <th><i class="fas fa-graduation-cap"></i> 年级</th>
+                            <th><i class="fas fa-chalkboard"></i> 旷课<br>(-5分/次)</th>
+                            <th><i class="fas fa-clock"></i> 迟到/早退<br>(-2分/次)</th>
+                            <th><i class="fas fa-plug"></i> 不规范用电<br>(-5分/次)</th>
+                            <th><i class="fas fa-moon"></i> 晚归<br>(-3分/次)</th>
+                            <th><i class="fas fa-bed"></i> 夜不归宿<br>(-10分/次)</th>
+                            <th><i class="fas fa-broom"></i> 宿舍卫生<br>(70-79扣3分,&lt;70扣5分)</th>
+                            <th><i class="fas fa-trash"></i> 垃圾未下楼<br>(-2分/次)</th>
+                            <th><i class="fas fa-plus-circle"></i> 其他<br>(自定义)</th>
+                            <th><i class="fas fa-calculator"></i> 总扣分</th>
+                            <th><i class="fas fa-star"></i> 当前品行分</th>
+                            <th><i class="fas fa-cog"></i> 操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="student-stats-body"></tbody>
+                </table>
+            </div>
+            <div class="stats-footer" id="stats-footer"><i class="fas fa-chart-line"></i> 加载中...</div>
+        </div>
+        
+        <!-- 班级板块 -->
+        <div id="class-section" class="section-content">
+            <div class="rank-title" style="margin: 0 30px 15px 30px;"><i class="fas fa-school"></i> 各班级学生品行分排名</div>
+            <div id="class-grid-container" class="class-grid">
+                <div style="text-align:center; padding:30px; width:100%;"><i class="fas fa-spinner fa-pulse"></i> 加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="module-select-modal" class="modal"><div class="modal-content">
+        <h3><i class="fas fa-hand-point-right"></i> 选择扣分模块</h3>
+        <div class="module-selector"><label><i class="fas fa-tag"></i> 扣分模块：</label>
+            <select id="selected-module">
+                <option value="absent">旷课 (-5分/次)</option><option value="late">迟到/早退 (-2分/次)</option>
+                <option value="electric">宿舍不规范用电 (-5分/次)</option><option value="lateReturn">晚归 (-3分/次)</option>
+                <option value="overnight">夜不归宿 (-10分/次)</option>
+                <option value="hygiene">宿舍卫生 (根据分数自动扣分)</option>
+                <option value="trash">垃圾未扔下楼 (-2分/次)</option>
+                <option value="other">其他 (自定义扣分)</option>
+            </select>
+        </div>
+        <div class="module-selector" id="custom-points-group" style="display:none;">
+            <label><i class="fas fa-sort-numeric-down"></i> 自定义扣分数：</label>
+            <input type="number" id="custom-points" step="0.5" min="0.5" value="1">
+        </div>
+        <div class="module-selector">
+            <label><i class="fas fa-calendar-alt"></i> 扣分日期（可选，不填则使用今天）：</label>
+            <input type="date" id="deduction-date">
+        </div>
+        <div class="modal-buttons"><button onclick="closeModuleModal()">取消</button><button id="nextStepBtn" style="background:#28a745;">下一步</button></div>
+    </div></div>
+
+    <div id="student-match-modal" class="modal"><div class="modal-content">
+        <h3><i class="fas fa-hand-point-right"></i> 请匹配Excel列对应关系</h3>
+        <div id="student-match-fields" class="match-fields-container"></div>
+        <div class="preview-table" id="student-preview-area"></div>
+        <div class="modal-buttons"><button onclick="closeStudentMatchModal()">取消</button><button id="confirmStudentBtn" style="background:#28a745;">确认导入</button></div>
+    </div></div>
+
+    <div id="deduction-match-modal" class="modal"><div class="modal-content">
+        <h3><i class="fas fa-hand-point-right"></i> 请匹配Excel列对应关系</h3>
+        <div id="deduction-match-fields" class="match-fields-container"></div>
+        <div class="preview-table" id="deduction-preview-area"></div>
+        <div class="modal-buttons"><button onclick="closeDeductionMatchModal()">取消</button><button id="confirmDeductionBtn" style="background:#28a745;">确认导入</button></div>
+    </div></div>
+
+    <div id="class-export-modal" class="modal"><div class="modal-content" style="max-width: 400px;">
+        <h3><i class="fas fa-school"></i> 选择要导出的班级</h3>
+        <div id="class-select-list" class="match-fields-container"></div>
+        <div class="modal-buttons"><button onclick="closeClassExportModal()">取消</button><button id="confirmClassExportBtn" style="background:#28a745;">导出</button></div>
+    </div></div>
+
+    <div id="detail-modal" class="modal"><div class="modal-content detail-modal">
+        <h3><i class="fas fa-user-graduate"></i> 学生扣分明细</h3>
+        <div id="detail-content" class="detail-list"></div>
+        <div class="modal-buttons"><button onclick="closeDetailModal()">关闭</button></div>
+    </div></div>
+
+    <input type="file" id="file-input-student" accept=".xlsx,.xls,.csv" style="display: none;">
+    <input type="file" id="file-input-deduction" accept=".xlsx,.xls,.csv" style="display: none;">
+    <input type="file" id="file-input-json" accept=".json" style="display: none;">
+
+    <script>
+        // ============================================================================
+        // Supabase 配置
+        // ============================================================================
+        const SUPABASE_URL = 'https://nadqdwmjxryfgdgcnzee.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hZHFkd21qeHJ5ZmdkZ2NuemVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MDk4NDAsImV4cCI6MjA5NzA4NTg0MH0.svwzdRJnWr2y8ldiMT79wm-TiF00TEivd02e1mBXqGo';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let studentList = [];
+        let deductionList = [];
+        let pendingExcelRows = null;
+        let pendingModuleKey = null;
+        let pendingModulePoints = null;
+        let pendingDeductionDate = null;
+        
+        const INITIAL_SCORE = 100;
+        
+        const deductionModules = {
+            absent: { name: '旷课', defaultPoints: 5 },
+            late: { name: '迟到/早退', defaultPoints: 2 },
+            electric: { name: '不规范用电', defaultPoints: 5 },
+            lateReturn: { name: '晚归', defaultPoints: 3 },
+            overnight: { name: '夜不归宿', defaultPoints: 10 },
+            hygiene: { name: '宿舍卫生', defaultPoints: null },
+            trash: { name: '垃圾未下楼', defaultPoints: 2 },
+            other: { name: '其他', defaultPoints: 0 }
+        };
+        
+        function getHygienePoints(score) {
+            if (score >= 80) return 0;
+            if (score >= 70) return 3;
+            return 5;
+        }
+        
+        async function loadFromCloud() {
+            updateSyncStatus('正在从云端同步...', 'loading');
+            try {
+                const { data: students } = await supabaseClient.from('students').select('*');
+                const { data: deductions } = await supabaseClient.from('deductions').select('*');
+                if (students) {
+                    studentList = students.map(s => ({
+                        id: s.id,
+                        name: s.name,
+                        studentId: s.student_id,
+                        class: s.class || '未分班',
+                        grade: s.grade || '未知年级'
+                    }));
+                }
+                if (deductions) {
+                    deductionList = deductions.map(d => ({
+                        id: d.id,
+                        studentId: d.student_id,
+                        studentName: d.student_name,
+                        moduleKey: d.module_key,
+                        moduleName: d.module_name,
+                        points: d.points,
+                        date: d.date,
+                        note: d.note || ''
+                    }));
+                }
+                localStorage.setItem('studentList', JSON.stringify(studentList));
+                localStorage.setItem('deductionList', JSON.stringify(deductionList));
+                updateSyncStatus('同步成功', 'success');
+                setTimeout(() => updateSyncStatus('已同步', 'normal'), 2000);
+                updateAll();
+            } catch(e) { 
+                console.error(e);
+                updateSyncStatus('连接失败，使用本地数据', 'error');
+                const localStudents = localStorage.getItem('studentList');
+                const localDeductions = localStorage.getItem('deductionList');
+                if (localStudents) studentList = JSON.parse(localStudents);
+                if (localDeductions) deductionList = JSON.parse(localDeductions);
+                updateAll();
+            }
+        }
+        
+        async function saveToCloud() {
+            updateSyncStatus('正在保存到云端...', 'loading');
+            try {
+                await supabaseClient.from('students').delete().neq('id', '0');
+                await supabaseClient.from('deductions').delete().neq('id', '0');
+                
+                if (studentList.length > 0) {
+                    const studentsForCloud = studentList.map(s => ({
+                        id: s.id,
+                        name: s.name,
+                        student_id: s.studentId,
+                        class: s.class,
+                        grade: s.grade
+                    }));
+                    const { error } = await supabaseClient.from('students').insert(studentsForCloud);
+                    if (error) throw error;
+                }
+                if (deductionList.length > 0) {
+                    const deductionsForCloud = deductionList.map(d => ({
+                        id: d.id,
+                        student_id: d.studentId,
+                        student_name: d.studentName,
+                        module_key: d.moduleKey,
+                        module_name: d.moduleName,
+                        points: d.points,
+                        date: d.date,
+                        note: d.note || ''
+                    }));
+                    const { error } = await supabaseClient.from('deductions').insert(deductionsForCloud);
+                    if (error) throw error;
+                }
+                updateSyncStatus('保存成功', 'success');
+                setTimeout(() => updateSyncStatus('已同步', 'normal'), 2000);
+                return true;
+            } catch(e) {
+                console.error(e);
+                updateSyncStatus('保存失败', 'error');
+                return false;
+            }
+        }
+        
+        function updateSyncStatus(message, type) {
+            const statusSpan = document.getElementById('sync-status');
+            const syncBar = document.getElementById('sync-bar');
+            if (!statusSpan) return;
+            statusSpan.innerHTML = message;
+            syncBar.className = 'sync-bar ' + type;
+            if (type === 'success') setTimeout(() => syncBar.className = 'sync-bar', 2000);
+        }
+        
+        async function saveData() {
+            localStorage.setItem('studentList', JSON.stringify(studentList));
+            localStorage.setItem('deductionList', JSON.stringify(deductionList));
+            await saveToCloud();
+            updateAll();
+        }
+        
+        function calculateStudentStats() {
+            const stats = {};
+            for (const student of studentList) {
+                stats[student.studentId] = {
+                    studentId: student.studentId,
+                    name: student.name,
+                    class: student.class || '未分班',
+                    grade: student.grade || '未知年级',
+                    modules: {
+                        absent: { count: 0, totalPoints: 0 },
+                        late: { count: 0, totalPoints: 0 },
+                        electric: { count: 0, totalPoints: 0 },
+                        lateReturn: { count: 0, totalPoints: 0 },
+                        overnight: { count: 0, totalPoints: 0 },
+                        hygiene: { count: 0, totalPoints: 0 },
+                        trash: { count: 0, totalPoints: 0 },
+                        other: { count: 0, totalPoints: 0 }
+                    },
+                    totalDeduction: 0
+                };
+            }
+            for (const record of deductionList) {
+                const studentStat = stats[record.studentId];
+                if (studentStat && record.moduleKey) {
+                    const module = studentStat.modules[record.moduleKey];
+                    if (module) {
+                        module.count++;
+                        module.totalPoints += record.points;
+                        studentStat.totalDeduction += record.points;
+                    }
+                }
+            }
+            return Object.values(stats);
+        }
+        
+        function getRanking() {
+            const stats = calculateStudentStats();
+            const ranking = stats.map(s => ({ ...s, currentScore: INITIAL_SCORE - s.totalDeduction }));
+            ranking.sort((a, b) => b.currentScore - a.currentScore);
+            return ranking;
+        }
+        
+        function getStudentsByClass() {
+            const stats = calculateStudentStats();
+            const classMap = new Map();
+            for (const s of stats) {
+                const className = s.class || '未分班';
+                if (!classMap.has(className)) classMap.set(className, []);
+                classMap.get(className).push({ name: s.name, studentId: s.studentId, score: INITIAL_SCORE - s.totalDeduction, grade: s.grade });
+            }
+            for (const students of classMap.values()) students.sort((a, b) => b.score - a.score);
+            return Array.from(classMap.keys()).sort().map(cn => ({ className: cn, students: classMap.get(cn) }));
+        }
+        
+        function getAllClasses() {
+            return [...new Set(studentList.map(s => s.class).filter(c => c))].sort();
+        }
+        
+        function renderRanking() {
+            const container = document.getElementById('rank-list');
+            if (!container) return;
+            const ranking = getRanking();
+            if (ranking.length === 0) { container.innerHTML = '<div style="text-align:center; padding:30px;"><i class="fas fa-inbox"></i> 暂无数据</div>'; return; }
+            let html = '';
+            for (let i = 0; i < ranking.length; i++) {
+                const s = ranking[i];
+                let rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+                let scoreClass = s.currentScore >= 90 ? 'excellent' : s.currentScore >= 75 ? 'good' : s.currentScore >= 60 ? 'normal' : 'poor';
+                html += `<div class="rank-item">
+                    <div class="rank-number ${rankClass}">${i+1}</div>
+                    <div class="rank-info">
+                        <span class="rank-name"><i class="fas fa-user-graduate"></i> ${escapeHtml(s.name)}</span>
+                        <span class="rank-class"><i class="fas fa-building"></i> ${escapeHtml(s.class)}</span>
+                    </div>
+                    <div class="rank-score ${scoreClass}">${s.currentScore.toFixed(1)} 分</div>
+                </div>`;
+            }
+            container.innerHTML = html;
+            const rankTitle = document.querySelector('.rank-section .rank-title');
+            if (rankTitle) rankTitle.innerHTML = `<i class="fas fa-trophy"></i> 个人品行分排名（共${ranking.length}人）`;
+        }
+        
+        function renderClassSection() {
+            const container = document.getElementById('class-grid-container');
+            if (!container) return;
+            const classData = getStudentsByClass();
+            if (classData.length === 0) { container.innerHTML = '<div style="text-align:center; padding:30px;"><i class="fas fa-inbox"></i> 暂无数据</div>'; return; }
+            let html = '';
+            for (const cls of classData) {
+                html += `<div class="class-card"><div class="class-card-header"><i class="fas fa-school"></i> ${escapeHtml(cls.className)} <span style="font-size:12px;"> (共${cls.students.length}人)</span></div><div class="class-rank-list">`;
+                for (let i = 0; i < cls.students.length; i++) {
+                    const s = cls.students[i];
+                    let rankDisplay = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1).toString();
+                    let scoreClass = s.score >= 90 ? 'excellent' : s.score >= 75 ? 'good' : s.score >= 60 ? 'normal' : 'poor';
+                    html += `<div class="class-rank-item">
+                        <div class="class-rank-num">${rankDisplay}</div>
+                        <div class="class-rank-name">${escapeHtml(s.name)}</div>
+                        <div class="class-rank-score ${scoreClass}">${s.score.toFixed(1)}分</div>
+                    </div>`;
+                }
+                html += `</div></div>`;
+            }
+            container.innerHTML = html;
+        }
+        
+        function renderStudentStatsTable() {
+            const tbody = document.getElementById('student-stats-body');
+            if (!tbody) return;
+            const stats = calculateStudentStats();
+            if (stats.length === 0) { tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;"><i class="fas fa-inbox"></i> 暂无数据，请先导入学生名单和扣分记录</td><\/tr>'; return; }
+            let html = '';
+            for (const s of stats) {
+                const currentScore = INITIAL_SCORE - s.totalDeduction;
+                let scoreClass = currentScore >= 90 ? 'excellent' : currentScore >= 75 ? 'good' : currentScore >= 60 ? 'normal' : 'poor';
+                html += `<tr>
+                    <td style="font-weight:600; text-align:left;">${escapeHtml(s.name)}</td>
+                    <td>${escapeHtml(s.studentId)}</td>
+                    <td>${escapeHtml(s.class)}</td>
+                    <td>${escapeHtml(s.grade)}</td>
+                    <td class="deduction-cell">${s.modules.absent.count > 0 ? `<span class="deduction-count">${s.modules.absent.count}次 (${s.modules.absent.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.late.count > 0 ? `<span class="deduction-count">${s.modules.late.count}次 (${s.modules.late.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.electric.count > 0 ? `<span class="deduction-count">${s.modules.electric.count}次 (${s.modules.electric.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.lateReturn.count > 0 ? `<span class="deduction-count">${s.modules.lateReturn.count}次 (${s.modules.lateReturn.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.overnight.count > 0 ? `<span class="deduction-count">${s.modules.overnight.count}次 (${s.modules.overnight.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.hygiene.count > 0 ? `<span class="deduction-count">${s.modules.hygiene.count}次 (${s.modules.hygiene.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.trash.count > 0 ? `<span class="deduction-count">${s.modules.trash.count}次 (${s.modules.trash.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="deduction-cell">${s.modules.other.count > 0 ? `<span class="deduction-count">${s.modules.other.count}次 (${s.modules.other.totalPoints}分)</span>` : '<span class="deduction-zero">0</span>'}</td>
+                    <td class="total-deduction">-${s.totalDeduction.toFixed(1)} 分</td>
+                    <td class="final-score ${scoreClass}">${currentScore.toFixed(1)} 分</td>
+                    <td class="action-buttons"><button class="edit-btn btn-small" onclick="viewStudentDetails('${s.studentId}')"><i class="fas fa-eye"></i> 详情</button></td>
+                竞争`;
+            }
+            tbody.innerHTML = html;
+            const totalStudents = studentList.length;
+            const totalDeductions = deductionList.length;
+            const ranking = getRanking();
+            const avgScore = ranking.length > 0 ? ranking.reduce((sum, s) => sum + s.currentScore, 0) / ranking.length : 0;
+            document.getElementById('stats-footer').innerHTML = `<i class="fas fa-chart-line"></i> 学生总数: ${totalStudents} 人 | 扣分记录: ${totalDeductions} 条 | 平均品行分: ${avgScore.toFixed(1)} 分`;
+        }
+        
+        function updateAll() { renderRanking(); renderClassSection(); renderStudentStatsTable(); }
+        
+        function viewStudentDetails(studentId) {
+            const student = studentList.find(s => s.studentId === studentId);
+            if (!student) return;
+            const records = deductionList.filter(d => d.studentId === studentId);
+            let msg = `学生：${student.name} (${student.studentId})\n班级：${student.class} | 年级：${student.grade}\n\n扣分记录：\n`;
+            if (records.length === 0) msg += '无扣分记录';
+            else for (const r of records) msg += `- ${r.date || '无日期'} | ${r.moduleName} | -${r.points}分 | ${r.note || '无备注'}\n`;
+            alert(msg);
+        }
+        
+        function switchSection(section) {
+            document.querySelectorAll('.section-tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById('overall-section').classList.remove('active');
+            document.getElementById('class-section').classList.remove('active');
+            if (section === 'overall') {
+                document.querySelectorAll('.section-tab')[0].classList.add('active');
+                document.getElementById('overall-section').classList.add('active');
+            } else {
+                document.querySelectorAll('.section-tab')[1].classList.add('active');
+                document.getElementById('class-section').classList.add('active');
+                renderClassSection();
+            }
+        }
+        
+        function openStudentImport() { document.getElementById('file-input-student').click(); }
+        function openDeductionImport() { document.getElementById('file-input-deduction').click(); }
+        
+        function waitForXLSX(callback) {
+            if (typeof XLSX !== 'undefined') {
+                callback();
+            } else {
+                setTimeout(function() { waitForXLSX(callback); }, 100);
+            }
+        }
+        
+        document.getElementById('file-input-student').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            waitForXLSX(async function() {
+                const reader = new FileReader();
+                reader.onload = async function(evt) {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+                        let validRows = [];
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (!row || row.length === 0) continue;
+                            const hasContent = row.some(cell => cell && String(cell).trim() !== '');
+                            if (!hasContent) continue;
+                            const rowStr = row.join(' ').toLowerCase();
+                            if (rowStr.includes('姓名') && rowStr.includes('学号')) continue;
+                            if (rowStr.length < 5) continue;
+                            validRows.push(row);
+                        }
+                        if (validRows.length === 0) { alert('没有找到有效数据行'); return; }
+                        pendingExcelRows = validRows;
+                        showStudentMatchDialog(validRows);
+                    } catch (error) { alert('读取文件失败：' + error.message); }
+                    e.target.value = '';
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        });
+        
+        document.getElementById('file-input-deduction').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            waitForXLSX(function() {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+                        let validRows = [];
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (!row || row.length === 0) continue;
+                            const hasContent = row.some(cell => cell && String(cell).trim() !== '');
+                            if (!hasContent) continue;
+                            const rowStr = row.join(' ').toLowerCase();
+                            if (rowStr.includes('姓名') && rowStr.includes('学号')) continue;
+                            if (rowStr.length < 5) continue;
+                            validRows.push(row);
+                        }
+                        if (validRows.length === 0) { alert('没有找到有效数据行'); return; }
+                        pendingExcelRows = validRows;
+                        document.getElementById('selected-module').value = 'absent';
+                        document.getElementById('custom-points-group').style.display = 'none';
+                        document.getElementById('deduction-date').value = new Date().toISOString().split('T')[0];
+                        document.getElementById('module-select-modal').style.display = 'block';
+                    } catch (error) { alert('读取文件失败：' + error.message); }
+                    e.target.value = '';
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        });
+        
+        document.getElementById('nextStepBtn').addEventListener('click', function() {
+            pendingModuleKey = document.getElementById('selected-module').value;
+            if (pendingModuleKey === 'other') {
+                const customPoints = parseFloat(document.getElementById('custom-points').value);
+                if (isNaN(customPoints) || customPoints <= 0) { alert('请输入有效的自定义扣分数'); return; }
+                pendingModulePoints = customPoints;
+            }
+            pendingDeductionDate = document.getElementById('deduction-date').value || new Date().toISOString().split('T')[0];
+            document.getElementById('module-select-modal').style.display = 'none';
+            showDeductionMatchDialog(pendingExcelRows);
+        });
+        
+        function showStudentMatchDialog(rows) {
+            const totalCols = Math.max(...rows.map(r => r ? r.length : 0));
+            let previewHtml = '<table border="1"><thead><tr>';
+            for (let j = 0; j < Math.min(totalCols, 10); j++) previewHtml += `<th>列${j+1}</th>`;
+            previewHtml += '</tr></thead><tbody>';
+            for (let i = 0; i < Math.min(rows.length, 5); i++) {
+                previewHtml += '<tr>';
+                for (let j = 0; j < Math.min(totalCols, 10); j++) {
+                    let val = rows[i][j] || '';
+                    if (String(val).length > 15) val = String(val).substring(0,15)+'...';
+                    previewHtml += `<td>${escapeHtml(String(val))}</td>`;
+                }
+                previewHtml += '</tr>';
+            }
+            previewHtml += '</tbody></tr>';
+            document.getElementById('student-preview-area').innerHTML = previewHtml;
+            let opts = '';
+            for (let i = 0; i < totalCols; i++) opts += `<option value="${i}">第 ${i+1} 列</option>`;
+            let fieldsHtml = `
+                <div class="match-field-group"><label>姓名列（必选）</label><select id="student-match-name">${opts}</select></div>
+                <div class="match-field-group"><label>学号列（必选）</label><select id="student-match-studentId">${opts}</select></div>
+                <div class="match-field-group"><label>班级列</label><select id="student-match-class">${opts}</select></div>
+                <div class="match-field-group"><label>年级列</label><select id="student-match-grade">${opts}</select></div>
+            `;
+            document.getElementById('student-match-fields').innerHTML = fieldsHtml;
+            document.getElementById('student-match-modal').style.display = 'block';
+            document.getElementById('confirmStudentBtn').onclick = async function() {
+                const nameCol = parseInt(document.getElementById('student-match-name').value);
+                const idCol = parseInt(document.getElementById('student-match-studentId').value);
+                const classCol = parseInt(document.getElementById('student-match-class').value);
+                const gradeCol = parseInt(document.getElementById('student-match-grade').value);
+                if (isNaN(nameCol) || isNaN(idCol)) { alert('请选择姓名列和学号列'); return; }
+                let newCount = 0;
+                for (let idx = 0; idx < rows.length; idx++) {
+                    const row = rows[idx];
+                    const name = String(row[nameCol] || '').trim();
+                    const sid = String(row[idCol] || '').trim();
+                    if (!name || !sid) continue;
+                    if (!studentList.some(s => s.studentId === sid)) {
+                        const cls = (!isNaN(classCol) && classCol !== -1) ? String(row[classCol] || '').trim() : '未分班';
+                        const gd = (!isNaN(gradeCol) && gradeCol !== -1) ? String(row[gradeCol] || '').trim() : '未知年级';
+                        studentList.push({ id: Date.now() + Math.random() + idx, name, studentId: sid, class: cls, grade: gd });
+                        newCount++;
+                    }
+                }
+                if (newCount > 0) await saveData();
+                alert(`导入完成！新增：${newCount} 人`);
+                document.getElementById('student-match-modal').style.display = 'none';
+            };
+        }
+        
+        function showDeductionMatchDialog(rows) {
+            const totalCols = Math.max(...rows.map(r => r ? r.length : 0));
+            let previewHtml = '<table border="1"><thead><tr>';
+            for (let j = 0; j < Math.min(totalCols, 10); j++) previewHtml += `<th>列${j+1}</th>`;
+            previewHtml += '</tr></thead><tbody>';
+            for (let i = 0; i < Math.min(rows.length, 5); i++) {
+                previewHtml += '<tr>';
+                for (let j = 0; j < Math.min(totalCols, 10); j++) {
+                    let val = rows[i][j] || '';
+                    if (String(val).length > 15) val = String(val).substring(0,15)+'...';
+                    previewHtml += `<td>${escapeHtml(String(val))}</td>`;
+                }
+                previewHtml += '</tr>';
+            }
+            previewHtml += '</tbody></table>';
+            document.getElementById('deduction-preview-area').innerHTML = previewHtml;
+            let opts = '<option value="-1">-- 不导入此项 --</option>';
+            for (let i = 0; i < totalCols; i++) opts += `<option value="${i}">第 ${i+1} 列</option>`;
+            let fieldsHtml = `
+                <div class="match-field-group"><label>姓名列（与学号二选一）</label><select id="deduction-match-name">${opts}</select></div>
+                <div class="match-field-group"><label>学号列（与姓名二选一）</label><select id="deduction-match-studentId">${opts}</select></div>
+                <div class="match-field-group"><label>分数/扣分值列（选填）</label><select id="deduction-match-points">${opts}</select></div>
+            `;
+            document.getElementById('deduction-match-fields').innerHTML = fieldsHtml;
+            document.getElementById('deduction-match-modal').style.display = 'block';
+            document.getElementById('confirmDeductionBtn').onclick = async function() {
+                const nameCol = parseInt(document.getElementById('deduction-match-name').value);
+                const idCol = parseInt(document.getElementById('deduction-match-studentId').value);
+                const pointsCol = parseInt(document.getElementById('deduction-match-points').value);
+                if ((isNaN(nameCol) || nameCol === -1) && (isNaN(idCol) || idCol === -1)) { alert('请至少选择姓名列或学号列'); return; }
+                let newCount = 0, skipCount = 0;
+                for (const row of rows) {
+                    let student = null;
+                    if (!isNaN(idCol) && idCol !== -1) {
+                        const sid = String(row[idCol] || '').trim();
+                        if (sid) student = studentList.find(s => s.studentId === sid);
+                    }
+                    if (!student && !isNaN(nameCol) && nameCol !== -1) {
+                        const name = String(row[nameCol] || '').trim();
+                        if (name) student = studentList.find(s => s.name === name);
+                    }
+                    if (!student) { skipCount++; continue; }
+                    let points = 0;
+                    if (pendingModuleKey === 'hygiene') {
+                        let raw = (!isNaN(pointsCol) && pointsCol !== -1) ? parseFloat(row[pointsCol]) : null;
+                        if (raw === null || isNaN(raw)) { skipCount++; continue; }
+                        points = getHygienePoints(raw);
+                        if (points === 0) continue;
+                    } else if (pendingModuleKey === 'other') {
+                        points = pendingModulePoints;
+                    } else {
+                        if (!isNaN(pointsCol) && pointsCol !== -1) {
+                            const ep = parseFloat(row[pointsCol]);
+                            points = !isNaN(ep) && ep > 0 ? ep : deductionModules[pendingModuleKey].defaultPoints;
+                        } else {
+                            points = deductionModules[pendingModuleKey].defaultPoints;
+                        }
+                    }
+                    deductionList.push({
+                        id: Date.now() + Math.random() * 10000,
+                        studentId: student.studentId,
+                        studentName: student.name,
+                        moduleKey: pendingModuleKey,
+                        moduleName: deductionModules[pendingModuleKey].name,
+                        points: points,
+                        date: pendingDeductionDate,
+                        note: ''
+                    });
+                    newCount++;
+                }
+                if (newCount > 0) await saveData();
+                alert(`导入完成！新增：${newCount} 条，跳过：${skipCount} 条`);
+                document.getElementById('deduction-match-modal').style.display = 'none';
+            };
+        }
+        
+        function exportAllToExcel() {
+            waitForXLSX(function() {
+                const wb = XLSX.utils.book_new();
+                const ranking = getRanking();
+                const rankData = [['排名', '姓名', '学号', '班级', '年级', '品行分', '总扣分']];
+                for (let i = 0; i < ranking.length; i++) {
+                    const s = ranking[i];
+                    rankData.push([i+1, s.name, s.studentId, s.class, s.grade, s.currentScore.toFixed(1), s.totalDeduction.toFixed(1)]);
+                }
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rankData), '个人品行分排名');
+                
+                const classData = getStudentsByClass();
+                for (const cls of classData) {
+                    const sheetData = [['班级内排名', '姓名', '学号', '年级', '品行分', '总扣分']];
+                    for (let i = 0; i < cls.students.length; i++) {
+                        const s = cls.students[i];
+                        sheetData.push([i+1, s.name, s.studentId, s.grade, s.score.toFixed(1), (INITIAL_SCORE - s.score).toFixed(1)]);
+                    }
+                    const sheetName = cls.className.length > 31 ? cls.className.substring(0, 31) : cls.className;
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), sheetName);
+                }
+                
+                const stats = calculateStudentStats();
+                const moduleData = [['姓名', '学号', '班级', '年级', '旷课(次/分)', '迟到/早退(次/分)', '不规范用电(次/分)', '晚归(次/分)', '夜不归宿(次/分)', '宿舍卫生(次/分)', '垃圾未下楼(次/分)', '其他(次/分)', '总扣分', '当前品行分']];
+                for (const s of stats) {
+                    moduleData.push([
+                        s.name, s.studentId, s.class, s.grade,
+                        `${s.modules.absent.count}次/${s.modules.absent.totalPoints}分`,
+                        `${s.modules.late.count}次/${s.modules.late.totalPoints}分`,
+                        `${s.modules.electric.count}次/${s.modules.electric.totalPoints}分`,
+                        `${s.modules.lateReturn.count}次/${s.modules.lateReturn.totalPoints}分`,
+                        `${s.modules.overnight.count}次/${s.modules.overnight.totalPoints}分`,
+                        `${s.modules.hygiene.count}次/${s.modules.hygiene.totalPoints}分`,
+                        `${s.modules.trash.count}次/${s.modules.trash.totalPoints}分`,
+                        `${s.modules.other.count}次/${s.modules.other.totalPoints}分`,
+                        s.totalDeduction.toFixed(1),
+                        (INITIAL_SCORE - s.totalDeduction).toFixed(1)
+                    ]);
+                }
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(moduleData), '扣分明细表');
+                
+                const deductionData = [['姓名', '学号', '扣分类型', '扣分', '日期', '备注']];
+                for (const d of deductionList) deductionData.push([d.studentName, d.studentId, d.moduleName, d.points, d.date || '', d.note || '']);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(deductionData), '原始扣分记录');
+                
+                const studentData = [['姓名', '学号', '班级', '年级']];
+                for (const s of studentList) studentData.push([s.name, s.studentId, s.class, s.grade]);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(studentData), '学生名单');
+                
+                XLSX.writeFile(wb, `品行分管理系统_全部_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.xlsx`);
+                alert(`导出成功！学生：${studentList.length}人，扣分记录：${deductionList.length}条`);
+                document.getElementById('exportDropdownContent').classList.remove('show');
+            });
+        }
+        
+        function exportClassToExcel() {
+            const classes = getAllClasses();
+            if (classes.length === 0) { alert('暂无班级数据'); return; }
+            let html = '';
+            for (const cls of classes) {
+                html += `<div class="match-field-group"><label style="cursor:pointer;"><input type="radio" name="selected-class" value="${escapeHtml(cls)}"> ${escapeHtml(cls)}</label></div>`;
+            }
+            document.getElementById('class-select-list').innerHTML = html;
+            document.getElementById('class-export-modal').style.display = 'block';
+            document.getElementById('exportDropdownContent').classList.remove('show');
+            document.getElementById('confirmClassExportBtn').onclick = function() {
+                const selected = document.querySelector('input[name="selected-class"]:checked');
+                if (!selected) { alert('请选择一个班级'); return; }
+                exportSingleClass(selected.value);
+                document.getElementById('class-export-modal').style.display = 'none';
+            };
+        }
+        
+        function exportSingleClass(className) {
+            waitForXLSX(function() {
+                const stats = calculateStudentStats();
+                const classStudents = stats.filter(s => s.class === className).map(s => ({
+                    name: s.name, studentId: s.studentId, grade: s.grade,
+                    score: INITIAL_SCORE - s.totalDeduction, modules: s.modules
+                })).sort((a,b) => b.score - a.score);
+                const wb = XLSX.utils.book_new();
+                const rankData = [['排名', '姓名', '学号', '年级', '品行分', '总扣分']];
+                for (let i = 0; i < classStudents.length; i++) {
+                    const s = classStudents[i];
+                    rankData.push([i+1, s.name, s.studentId, s.grade, s.score.toFixed(1), (INITIAL_SCORE - s.score).toFixed(1)]);
+                }
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rankData), `${className}_学生排名`);
+                XLSX.writeFile(wb, `品行分管理系统_${className}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.xlsx`);
+                alert(`导出成功！班级：${className}，共${classStudents.length}人`);
+            });
+        }
+        
+        function downloadTemplate() {
+            waitForXLSX(function() {
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['姓名', '学号', '班级', '年级'], ['张三', '2024001', '计科1班', '大一']]), '学生名单模板');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['姓名', '学号', '分数'], ['张三', '', '75'], ['李四', '2024002', '65']]), '扣分记录模板');
+                XLSX.writeFile(wb, '品行分管理系统模板.xlsx');
+                alert('模板已开始下载');
+            });
+        }
+        
+        async function clearAllData() {
+            if (confirm('⚠️ 警告：这将删除所有学生数据和扣分记录，不可恢复！\n\n确定要清空所有数据吗？')) {
+                studentList = []; deductionList = [];
+                await saveData();
+                alert('✅ 所有数据已清空');
+            }
+        }
+        
+        function closeModuleModal() { document.getElementById('module-select-modal').style.display = 'none'; }
+        function closeStudentMatchModal() { document.getElementById('student-match-modal').style.display = 'none'; }
+        function closeDeductionMatchModal() { document.getElementById('deduction-match-modal').style.display = 'none'; }
+        function closeClassExportModal() { document.getElementById('class-export-modal').style.display = 'none'; }
+        function closeDetailModal() { document.getElementById('detail-modal').style.display = 'none'; }
+        
+        function escapeHtml(text) { if (!text) return ''; return text.replace(/[&<>]/g, function(m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]; }); }
+        
+        document.getElementById('exportDropdownBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('exportDropdownContent').classList.toggle('show');
+        });
+        document.addEventListener('click', () => document.getElementById('exportDropdownContent').classList.remove('show'));
+        document.getElementById('sync-btn').addEventListener('click', async () => { await loadFromCloud(); updateAll(); });
+        document.getElementById('selected-module').addEventListener('change', function() {
+            document.getElementById('custom-points-group').style.display = this.value === 'other' ? 'block' : 'none';
+        });
+        
+        window.switchSection = switchSection;
+        window.openStudentImport = openStudentImport;
+        window.openDeductionImport = openDeductionImport;
+        window.closeModuleModal = closeModuleModal;
+        window.closeStudentMatchModal = closeStudentMatchModal;
+        window.closeDeductionMatchModal = closeDeductionMatchModal;
+        window.closeClassExportModal = closeClassExportModal;
+        window.closeDetailModal = closeDetailModal;
+        window.exportAllToExcel = exportAllToExcel;
+        window.exportClassToExcel = exportClassToExcel;
+        window.downloadTemplate = downloadTemplate;
+        window.clearAllData = clearAllData;
+        window.viewStudentDetails = viewStudentDetails;
+        
+        loadFromCloud();
+    </script>
+</body>
+</html>
