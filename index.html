@@ -55,6 +55,7 @@
         .toolbar button.export-btn { background: #28a745; }
         .toolbar button.import-btn { background: #17a2b8; }
         .toolbar button.clear-btn { background: #dc3545; }
+        .toolbar button.reset-score-btn { background: #ffc107; color: #333; }
         .toolbar button:hover { opacity: 0.85; transform: translateY(-1px); }
         .export-dropdown { position: relative; display: inline-block; }
         .export-dropdown-content { display: none; position: absolute; background-color: white; min-width: 200px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); border-radius: 8px; z-index: 100; right: 0; top: 100%; margin-top: 5px; }
@@ -170,6 +171,8 @@
                     <button onclick="openClassExportModal()"><i class="fas fa-school"></i> 导出班级数据</button>
                 </div>
             </div>
+            <!-- 新增：重置所有学生分数至100分按钮 -->
+            <button class="reset-score-btn" onclick="resetAllScores()"><i class="fas fa-undo-alt"></i> 重置分数至100分</button>
             <button class="clear-btn" onclick="clearAllData()"><i class="fas fa-trash-alt"></i> 清空所有数据</button>
         </div>
 
@@ -381,7 +384,6 @@
             electric: { name: '不规范用电', defaultPoints: 5 },
             lateReturn: { name: '晚归', defaultPoints: 3 },
             overnight: { name: '夜不归宿', defaultPoints: 10 },
-            // 移除了 hygiene
             trash: { name: '垃圾未下楼', defaultPoints: 2 },
             other: { name: '其他', defaultPoints: 0 },
             dormHygiene: { name: '宿舍卫生(批量)', defaultPoints: null }
@@ -449,6 +451,29 @@
         }
 
         // ============================================================================
+        // 重置所有学生分数至100分（清空所有扣分记录）
+        // ============================================================================
+        async function resetAllScores() {
+            if (studentList.length === 0) {
+                alert('当前没有学生数据，无需重置。');
+                return;
+            }
+            // 二次确认，防止误操作
+            if (!confirm('⚠️ 此操作将删除所有学生的扣分记录，将每位学生的品行分重置为100分。\n\n确定要继续吗？')) {
+                return;
+            }
+            if (!confirm('再次确认：您确定要重置所有学生的分数至100分吗？此操作不可撤销！')) {
+                return;
+            }
+            
+            // 清空所有扣分记录
+            deductionList = [];
+            // 保存到云端和本地
+            await saveData();
+            alert('✅ 所有学生分数已重置为100分！');
+        }
+
+        // ============================================================================
         // 手动扣分
         // ============================================================================
         function resetManualForm() {
@@ -469,13 +494,7 @@
             const pointsGroup = document.getElementById('manual-points-group');
             const dormGroup = document.getElementById('manual-dorm-group');
             const nameInput = document.getElementById('manual-name');
-            if (this.value === 'hygiene') {
-                // 但hygiene已被移除，但保留逻辑以防万一
-                scoreGroup.style.display = 'flex';
-                pointsGroup.style.display = 'none';
-                dormGroup.style.display = 'none';
-                nameInput.style.display = 'block';
-            } else if (this.value === 'other') {
+            if (this.value === 'other') {
                 scoreGroup.style.display = 'none';
                 pointsGroup.style.display = 'flex';
                 dormGroup.style.display = 'none';
@@ -549,7 +568,7 @@
                 return;
             }
 
-            // 个人扣分（去掉了hygiene，但保留其他）
+            // 个人扣分
             const studentName = document.getElementById('manual-name').value.trim();
             const customPoints = parseFloat(document.getElementById('manual-points').value);
 
@@ -730,7 +749,6 @@
                         electric: { count: 0, totalPoints: 0 },
                         lateReturn: { count: 0, totalPoints: 0 },
                         overnight: { count: 0, totalPoints: 0 },
-                        // 保留 hygiene 用于已有的扣分数据
                         hygiene: { count: 0, totalPoints: 0 },
                         trash: { count: 0, totalPoints: 0 },
                         other: { count: 0, totalPoints: 0 }
@@ -1045,7 +1063,7 @@
         }
 
         // ============================================================================
-        // 导入功能：扣分记录（已移除分数列匹配）
+        // 导入功能：扣分记录
         // ============================================================================
         function openDeductionImport() {
             document.getElementById('file-input-deduction').click();
@@ -1117,7 +1135,6 @@
             document.getElementById('deduction-preview-area').innerHTML = previewHtml;
             let opts = '<option value="-1">-- 不导入此项 --</option>';
             for (let i = 0; i < totalCols; i++) opts += `<option value="${i}">第 ${i+1} 列</option>`;
-            // 移除了分数列匹配
             let fieldsHtml = `
                     <div class="match-field-group"><label>姓名列（与学号二选一）</label><select id="deduction-match-name">${opts}</select></div>
                     <div class="match-field-group"><label>学号列（与姓名二选一）</label><select id="deduction-match-studentId">${opts}</select></div>
@@ -1144,7 +1161,6 @@
                         if (name) student = studentList.find(s => s.name === name);
                     }
                     if (!student) { skipCount++; continue; }
-                    // 使用模块默认扣分，无分数列
                     let points = 0;
                     if (pendingModuleKey === 'other') {
                         points = pendingModulePoints;
@@ -1424,6 +1440,7 @@
         window.switchSection = switchSection;
         window.openStudentImport = openStudentImport;
         window.openDeductionImport = openDeductionImport;
+        window.resetAllScores = resetAllScores;
         window.closeModuleModal = closeModuleModal;
         window.closeStudentMatchModal = closeStudentMatchModal;
         window.closeDeductionMatchModal = closeDeductionMatchModal;
